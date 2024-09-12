@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -9,6 +10,9 @@ import (
 	"sync"
 	"time"
 )
+
+const helpMsg string = `Resolve hostnames via a provided DNS address:
+Usage: resolve-hostname <dns-server-ip-addr> <hostname1> <hostname2> ...`
 
 type Resolver struct {
 	resolver *net.Resolver
@@ -25,6 +29,7 @@ func (r *Resolver) resolveHostname(ctx context.Context, hostname string) {
 
 	log.Printf("IP addresses for %s: %v\n", hostname, addrString(ips))
 
+	// perform a reverse lookup for each resolved ip address
 	for _, ip := range ips {
 		names, err := r.resolver.LookupAddr(ctx, ip.String())
 		if err != nil {
@@ -43,13 +48,13 @@ func validIpAddr(address string) bool {
 	return ip != nil
 }
 
-// Use an alternate dialer  provided via`dnsServerAddr` string,
+// Use an alternate dialer provided via `dnsServerAddr` string,
 // specified without the port (53)
 // instead of the default DNS server's address
 func newResolver(dnsServerAddr string) Resolver {
 	r := Resolver{}
 	r.resolver = &net.Resolver{
-		PreferGo:     true, // 'false' results in using the default (network's) DNS server, avoiding lookups via the IP address provided
+		PreferGo:     true, // 'false' seems to result in using the default (network's) DNS server, avoiding lookups via the IP address provided
 		StrictErrors: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{Timeout: time.Second * 5}
@@ -75,7 +80,7 @@ func main() {
 	totalStart := time.Now()
 
 	if len(os.Args) < 3 {
-		log.Println("Usage: resolve-hostname <dns-server-ip-addr> <hostname1> <hostname2> ...")
+		fmt.Println(helpMsg)
 		return
 	}
 
