@@ -1,4 +1,4 @@
-Resolves hostnames (and reverse lookup) for n hostnames via the DNS server IP address provided.
+Resolves hostnames (and performs reverse lookup) for n hostnames via the DNS server IP address provided.
 
 ```bash
 go build
