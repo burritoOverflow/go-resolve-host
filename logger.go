@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 )
 
 type logger struct {
@@ -16,9 +15,12 @@ type logger struct {
 var globalLogger *logger
 
 func InitializeLogger() {
+	// file options (Llongfile Lshortfile) are nice but useless for this wrapper
+	// as we'd end up with `logger.go : line`
+	flags := log.Ldate | log.Ltime | log.Lmicroseconds
 	globalLogger = &logger{
-		infoLogger:  log.New(os.Stdout, "", 0),
-		errorLogger: log.New(os.Stderr, "", 0),
+		infoLogger:  log.New(os.Stdout, "", flags),
+		errorLogger: log.New(os.Stderr, "", flags),
 	}
 }
 
@@ -29,9 +31,7 @@ func maybeInitializeLogger() {
 }
 
 func formatLogMessage(prefix, format string, args ...interface{}) string {
-	now := time.Now()
-	timestamp := now.Format("2006-01-02 15:04:05.000") // Format with milliseconds
-	return fmt.Sprintf("%s %s%s", timestamp, prefix, fmt.Sprintf(format, args...))
+	return fmt.Sprintf("%s%s", prefix, fmt.Sprintf(format, args...))
 }
 
 func LogInfo(msg string, args ...interface{}) {
