@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strings"
@@ -18,33 +17,33 @@ type Resolver struct {
 	resolver *net.Resolver
 }
 
+// perform a reverse lookup for each ip address
+func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname string) {
+	for _, ip := range ips {
+		names, err := r.resolver.LookupAddr(ctx, ip.String())
+		if err != nil {
+			LogError("Error performing reverse lookup for %s (%s): %v", ip, hostname, err)
+		} else {
+			LogError("Reverse for %s (%s): %v", ip, hostname, strings.Join(names, ", "))
+		}
+	}
+}
+
 func (r *Resolver) resolveHostname(ctx context.Context, hostname string) {
 	startTime := time.Now()
 
 	ips, err := r.resolver.LookupIP(ctx, "ip4", hostname)
 	if err != nil {
-		log.Printf("Failed to resolve %s: %v\n", hostname, err)
+		LogError("Failed to resolve %s: %v\n", hostname, err)
 		return
 	}
 
-	log.Printf("IP addresses for %s: %v\n", hostname, addrString(ips))
+	LogInfo("IP addresses for %s: %v\n", hostname, addrString(ips))
 
-	// perform a reverse lookup for each resolved ip address
-	for _, ip := range ips {
-		names, err := r.resolver.LookupAddr(ctx, ip.String())
-		if err != nil {
-			log.Printf("Error performing reverse lookup for %s (%s): %v", ip, hostname, err)
-		} else {
-			log.Printf("Reverse for %s (%s): %v", ip, hostname, strings.Join(names, ", "))
-		}
-	}
+	r.resolveReverse(ctx, ips, hostname)
 
-	duration := time.Since(startTime)
-	log.Printf("Duration for resolving %s: %d ms\n", hostname, duration.Milliseconds())
-}
-
-func validIpAddr(address string) bool {
-	return net.ParseIP(address) != nil
+	durationMs := time.Since(startTime).Milliseconds()
+	LogInfo("Duration for resolving %s: %d ms\n", hostname, durationMs)
 }
 
 // Use an alternate dialer provided via `dnsServerAddr` string,
@@ -76,6 +75,7 @@ func addrString(ips []net.IP) string {
 }
 
 func main() {
+	InitializeLogger()
 	totalStart := time.Now()
 
 	if len(os.Args) < 3 {
@@ -83,9 +83,10 @@ func main() {
 		return
 	}
 
+	// ensure this is a valid ip address
 	dnsServerIp := os.Args[1]
-	if !validIpAddr(dnsServerIp) {
-		log.Fatalf("Invalid ip address: %s", dnsServerIp)
+	if !(net.ParseIP(dnsServerIp) != nil) {
+		LogError("Invalid ip address: %s", dnsServerIp)
 		os.Exit(1)
 	}
 
@@ -107,5 +108,5 @@ func main() {
 
 	totalDuration := time.Since(totalStart)
 	addrs := strings.Join(os.Args[2:], ", ")
-	log.Printf("Total duration for %d addresses: %s: %d ms\n", len(os.Args[2:]), addrs, totalDuration.Milliseconds())
+	LogInfo("Total duration for %d addresses: %s: %d ms\n", len(os.Args[2:]), addrs, totalDuration.Milliseconds())
 }
