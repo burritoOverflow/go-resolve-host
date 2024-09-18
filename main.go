@@ -44,31 +44,30 @@ func (r *Resolver) resolveHostname(ctx context.Context, hostname string) {
 }
 
 func validIpAddr(address string) bool {
-	ip := net.ParseIP(address)
-	return ip != nil
+	return net.ParseIP(address) != nil
 }
 
 // Use an alternate dialer provided via `dnsServerAddr` string,
 // specified without the port (53)
 // instead of the default DNS server's address
 func newResolver(dnsServerAddr string) Resolver {
-	r := Resolver{}
-	r.resolver = &net.Resolver{
-		PreferGo:     true, // 'false' seems to result in using the default (network's) DNS server, avoiding lookups via the IP address provided
-		StrictErrors: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{Timeout: time.Second * 5}
-			return d.DialContext(ctx, "udp", dnsServerAddr+":53")
+	return Resolver{
+		resolver: &net.Resolver{
+			PreferGo:     true, // 'false' seems to result in using the default (network's) DNS server, avoiding lookups via the IP address provided
+			StrictErrors: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{Timeout: time.Second * 5}
+				return d.DialContext(ctx, "udp", dnsServerAddr+":53")
+			},
 		},
 	}
-	return r
 }
 
 func addrString(ips []net.IP) string {
 	addrStr := ""
 	for i, ip := range ips {
 		if i == len(ips)-1 {
-			addrStr += ip.String()
+			addrStr += ip.String() // avoid appending comma to last token
 		} else {
 			addrStr += ip.String() + ", "
 		}
@@ -90,12 +89,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	hostnames := os.Args[2:]
-
 	var wg sync.WaitGroup
 	ctx := context.Background()
-
 	r := newResolver(dnsServerIp)
+
+	hostnames := os.Args[2:]
 
 	for _, hostname := range hostnames {
 		wg.Add(1)
