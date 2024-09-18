@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -79,8 +79,7 @@ func main() {
 	totalStart := time.Now()
 
 	if len(os.Args) < 3 {
-		fmt.Println(helpMsg)
-		return
+		log.Fatalf(helpMsg)
 	}
 
 	// ensure this is a valid ip address
