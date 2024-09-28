@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -85,13 +87,12 @@ func addrString(ips []net.IP) string {
 // ensure this is a valid ip address
 // we have a valid IP provided for DNS; create our resolver for this
 // otherwise, we're using the default DNS server
-func getDnsResolver(dnsServerIp *string) *Resolver {
+func getDnsResolver(dnsServerIp *string) (*Resolver, error) {
 	r := Resolver{}
 
 	if len(*dnsServerIp) != 0 {
 		if !(net.ParseIP(*dnsServerIp) != nil) {
-			LogError("Invalid ip address: %s", *dnsServerIp)
-			os.Exit(1)
+			return nil, errors.New(fmt.Sprintf("Invalid ip address: %s", *dnsServerIp))
 		} else {
 			r = newResolver(*dnsServerIp)
 		}
@@ -99,7 +100,7 @@ func getDnsResolver(dnsServerIp *string) *Resolver {
 		r.resolver = net.DefaultResolver
 	}
 
-	return &r
+	return &r, nil
 }
 
 func main() {
@@ -115,7 +116,12 @@ func main() {
 		log.Fatalf(helpMsg)
 	}
 
-	r := getDnsResolver(dnsServerIp)
+	r, err := getDnsResolver(dnsServerIp)
+	if err != nil {
+		LogError(err.Error())
+		os.Exit(1)
+	}
+
 	var wg sync.WaitGroup
 	ctx := context.Background()
 
