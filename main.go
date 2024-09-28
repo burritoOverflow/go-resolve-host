@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net"
 	"os"
@@ -11,7 +12,7 @@ import (
 )
 
 const helpMsg string = `Resolve hostnames via a provided DNS address:
-Usage: resolve-hostname <dns-server-ip-addr> <hostname1> <hostname2> ...`
+Usage: resolve-hostname [-dnsserver dns-server-ip-addr] <hostname1> <hostname2> ...`
 
 type Resolver struct {
 	resolver *net.Resolver
@@ -20,6 +21,13 @@ type Resolver struct {
 // perform a reverse lookup for each ip address
 func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname string) {
 	for _, ip := range ips {
+		// ignore blocked hostnames
+		blockIpStr := "0.0.0.0"
+		if ip.Equal(net.ParseIP(blockIpStr)) {
+			LogInfo("Ignoring %s as it previously resolved to %s", hostname, blockIpStr)
+			continue
+		}
+
 		names, err := r.resolver.LookupAddr(ctx, ip.String())
 		if err != nil {
 			LogError("Error performing reverse lookup for %s (%s): %v", ip, hostname, err)
@@ -74,26 +82,42 @@ func addrString(ips []net.IP) string {
 	return addrStr
 }
 
+// ensure this is a valid ip address
+// we have a valid IP provided for DNS; create our resolver for this
+// otherwise, we're using the default DNS server
+func getDnsResolver(dnsServerIp *string) *Resolver {
+	r := Resolver{}
+
+	if len(*dnsServerIp) != 0 {
+		if !(net.ParseIP(*dnsServerIp) != nil) {
+			LogError("Invalid ip address: %s", *dnsServerIp)
+			os.Exit(1)
+		} else {
+			r = newResolver(*dnsServerIp)
+		}
+	} else {
+		r.resolver = net.DefaultResolver
+	}
+
+	return &r
+}
+
 func main() {
 	InitializeLogger()
 	totalStart := time.Now()
 
-	if len(os.Args) < 3 {
+	dnsServerIp := flag.String("dnsserver", "", "The DNS server to use to resolve hostnames")
+	flag.Parse()
+
+	hostnames := flag.Args()
+
+	if len(hostnames) == 0 {
 		log.Fatalf(helpMsg)
 	}
 
-	// ensure this is a valid ip address
-	dnsServerIp := os.Args[1]
-	if !(net.ParseIP(dnsServerIp) != nil) {
-		LogError("Invalid ip address: %s", dnsServerIp)
-		os.Exit(1)
-	}
-
+	r := getDnsResolver(dnsServerIp)
 	var wg sync.WaitGroup
 	ctx := context.Background()
-	r := newResolver(dnsServerIp)
-
-	hostnames := os.Args[2:]
 
 	for _, hostname := range hostnames {
 		wg.Add(1)
