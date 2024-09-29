@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-const helpMsg string = `Resolve hostnames via a provided DNS address:
-Usage: resolve-hostname [-dnsserver dns-server-ip-addr] <hostname1> <hostname2> ...`
+const helpMsg string = `Resolve hostnames via a provided DNS address; cancel if not complete by timeout:
+Usage: resolve-hostname [-dnsserver dns-server-ip-addr] [-timeout timeout-duration-ms] <hostname1> <hostname2> ...`
 
 type Resolver struct {
 	resolver *net.Resolver
@@ -26,7 +26,7 @@ func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname st
 		// ignore blocked hostnames
 		blockIpStr := "0.0.0.0"
 		if ip.Equal(net.ParseIP(blockIpStr)) {
-			LogInfo("Ignoring %s as it previously resolved to %s", hostname, blockIpStr)
+			LogInfo("Ignoring attempt to resolve reverse for %s as it previously resolved to %s", hostname, blockIpStr)
 			continue
 		}
 
@@ -56,6 +56,18 @@ func (r *Resolver) resolveHostname(ctx context.Context, hostname string) {
 	LogInfo("Duration for resolving %s: %d ms\n", hostname, durationMs)
 }
 
+func resolveHostnames(ctx context.Context, hostnames []string, r *Resolver) {
+	var wg sync.WaitGroup
+	for _, hostname := range hostnames {
+		wg.Add(1)
+		go func() {
+			r.resolveHostname(ctx, hostname)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
 // Use an alternate dialer provided via `dnsServerAddr` string,
 // specified without the port (53)
 // instead of the default DNS server's address
@@ -65,7 +77,7 @@ func newResolver(dnsServerAddr string) Resolver {
 			PreferGo:     true, // 'false' seems to result in using the default (network's) DNS server, avoiding lookups via the IP address provided
 			StrictErrors: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				d := net.Dialer{Timeout: time.Second * 5}
+				d := net.Dialer{}
 				return d.DialContext(ctx, "udp", dnsServerAddr+":53")
 			},
 		},
@@ -86,7 +98,7 @@ func addrString(ips []net.IP) string {
 
 // ensure this is a valid ip address
 // we have a valid IP provided for DNS; create our resolver for this
-// otherwise, we're using the default DNS server
+// otherwise, we'll use the default DNS server
 func getDnsResolver(dnsServerIp *string) (*Resolver, error) {
 	r := Resolver{}
 
@@ -103,15 +115,34 @@ func getDnsResolver(dnsServerIp *string) (*Resolver, error) {
 	return &r, nil
 }
 
+func prefixStr(total time.Duration, timeout time.Duration) string {
+	prefixStr := ""
+	if total > timeout {
+		prefixStr = "Deadline exceeded"
+	} else {
+		prefixStr = "Total duration"
+	}
+	return prefixStr
+}
+
 func main() {
 	InitializeLogger()
 	totalStart := time.Now()
 
+	// this is a bit short by default
+	defaultTimeoutMs := 1000
+
 	dnsServerIp := flag.String("dnsserver", "", "The DNS server to use to resolve hostnames")
+	timeoutArg := flag.Int("timeout", defaultTimeoutMs, "Timeout in milliseconds")
 	flag.Parse()
 
-	hostnames := flag.Args()
+	if *timeoutArg < 0 {
+		LogError("Invalid value provided for timeout: %d\n", *timeoutArg)
+		log.Fatalf(helpMsg)
+	}
 
+	// only hostnames are required
+	hostnames := flag.Args()
 	if len(hostnames) == 0 {
 		log.Fatalf(helpMsg)
 	}
@@ -122,20 +153,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	var wg sync.WaitGroup
-	ctx := context.Background()
+	timeout := time.Duration(*timeoutArg) * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-	for _, hostname := range hostnames {
-		wg.Add(1)
-		go func() {
-			r.resolveHostname(ctx, hostname)
-			wg.Done()
-		}()
-	}
-
-	wg.Wait()
+	resolveHostnames(ctx, hostnames, r)
 
 	totalDuration := time.Since(totalStart)
-	addrs := strings.Join(os.Args[2:], ", ")
-	LogInfo("Total duration for %d addresses: %s: %d ms\n", len(os.Args[2:]), addrs, totalDuration.Milliseconds())
+	addrs := strings.Join(hostnames, ", ")
+
+	LogInfo("%s for %d addresses %d ms: (%s)\n", prefixStr(totalDuration, timeout), len(hostnames), totalDuration.Milliseconds(), addrs)
 }
