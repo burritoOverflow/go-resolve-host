@@ -67,7 +67,7 @@ func (r *Resolver) resolveHostname(ctx context.Context, hostname string) {
 	LogInfo("Duration for resolving %s: %d ms\n", hostname, durationMs)
 }
 
-func resolveHostnames(ctx context.Context, hostnames []string, r *Resolver) {
+func (r *Resolver) resolveHostnames(ctx context.Context, hostnames []string) {
 	var wg sync.WaitGroup
 	for _, hostname := range hostnames {
 		wg.Add(1)
@@ -113,7 +113,7 @@ func addrString(ips []net.IP) string {
 func getDnsResolver(dnsServerIp *string) (*Resolver, error) {
 	r := Resolver{}
 
-	if len(*dnsServerIp) != 0 {
+	if dnsServerIp != nil && len(*dnsServerIp) != 0 {
 		if !(net.ParseIP(*dnsServerIp) != nil) {
 			return nil, errors.New(fmt.Sprintf("Invalid ip address: %s", *dnsServerIp))
 		} else {
@@ -168,7 +168,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	resolveHostnames(ctx, hostnames, r)
+	r.resolveHostnames(ctx, hostnames)
 
 	totalDuration := time.Since(totalStart)
 	addrs := strings.Join(hostnames, ", ")
