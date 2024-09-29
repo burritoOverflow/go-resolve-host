@@ -45,11 +45,13 @@ func (r *Resolver) ResolveHostname(ctx context.Context, network NetworkString, h
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
 			LogError("Failed to resolve: %s: Error - '%s', was not found: %t\n", hostname, dnsErr.Err, dnsErr.IsNotFound)
+		} else {
+			LogError("Failed to resolve: %s Error - '%s'", hostname, err.Error())
 		}
 		return
 	}
 
-	LogInfo("IP addresses for %s: %v\n", hostname, addrString(ips))
+	LogInfo("IP addresses for hostname '%s': %v\n", hostname, addrString(ips))
 
 	r.resolveReverse(ctx, ips, hostname)
 
@@ -89,7 +91,7 @@ func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname st
 		names, err := r.resolver.LookupAddr(ctx, ip.String())
 		if err != nil {
 			if dnsErr, ok := err.(*net.DNSError); ok {
-				LogError("Error performing reverse lookup for %s: Error - '%s', was not found: %t\n", hostname, dnsErr.Err, dnsErr.IsNotFound)
+				LogError("Error performing reverse lookup for %s (%s): Error - '%s', was not found: %t\n", hostname, ip.String(), dnsErr.Err, dnsErr.IsNotFound)
 			}
 		} else {
 			LogInfo("Reverse for %s (%s): %v", ip, hostname, strings.Join(names, ", "))

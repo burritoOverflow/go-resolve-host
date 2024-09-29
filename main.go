@@ -96,5 +96,5 @@ func main() {
 	totalDuration := time.Since(totalStart)
 	addrs := strings.Join(hostnames, ", ")
 
-	LogInfo("%s for %d addresses %d ms: (%s)\n", prefixStr(totalDuration, timeout), len(hostnames), totalDuration.Milliseconds(), addrs)
+	LogInfo("%s for %d addresses (%s): %d ms\n", prefixStr(totalDuration, timeout), len(hostnames), addrs, totalDuration.Milliseconds())
 }
