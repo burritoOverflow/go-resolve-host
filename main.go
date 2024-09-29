@@ -34,7 +34,7 @@ func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname st
 		if err != nil {
 			LogError("Error performing reverse lookup for %s (%s): %v", ip, hostname, err)
 		} else {
-			LogError("Reverse for %s (%s): %v", ip, hostname, strings.Join(names, ", "))
+			LogInfo("Reverse for %s (%s): %v", ip, hostname, strings.Join(names, ", "))
 		}
 	}
 }
