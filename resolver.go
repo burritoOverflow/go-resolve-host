@@ -12,6 +12,15 @@ type Resolver struct {
 	resolver *net.Resolver
 }
 
+type NetworkString string
+
+// Network type used for resolving hostnames
+const (
+	IP   NetworkString = "ip"
+	IPv4 NetworkString = "ip4"
+	IPv6 NetworkString = "ip6"
+)
+
 // Use an alternate dialer provided via `dnsServerAddr` string,
 // specified without the port (53)
 // instead of the default DNS server's address
@@ -28,10 +37,11 @@ func NewResolver(dnsServerAddr string) *Resolver {
 	}
 }
 
-func (r *Resolver) ResolveHostname(ctx context.Context, hostname string) {
+// Resolves the `hostname` provided for the `network` (ip4|ip6|ip) provided and resolves the reverse
+func (r *Resolver) ResolveHostname(ctx context.Context, network NetworkString, hostname string) {
 	startTime := time.Now()
 
-	ips, err := r.resolver.LookupIP(ctx, "ip4", hostname)
+	ips, err := r.resolver.LookupIP(ctx, string(network), hostname)
 	if err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok {
 			LogError("Failed to resolve: %s: Error - '%s', was not found: %t\n", hostname, dnsErr.Err, dnsErr.IsNotFound)
@@ -41,18 +51,18 @@ func (r *Resolver) ResolveHostname(ctx context.Context, hostname string) {
 
 	LogInfo("IP addresses for %s: %v\n", hostname, addrString(ips))
 
-	r.ResolveReverse(ctx, ips, hostname)
+	r.resolveReverse(ctx, ips, hostname)
 
 	durationMs := time.Since(startTime).Milliseconds()
 	LogInfo("Duration for resolving %s: %d ms\n", hostname, durationMs)
 }
 
-func (r *Resolver) ResolveHostnames(ctx context.Context, hostnames []string) {
+func (r *Resolver) ResolveHostnames(ctx context.Context, network NetworkString, hostnames []string) {
 	var wg sync.WaitGroup
 	for _, hostname := range hostnames {
 		wg.Add(1)
 		go func() {
-			r.ResolveHostname(ctx, hostname)
+			r.ResolveHostname(ctx, network, hostname)
 			wg.Done()
 		}()
 	}
@@ -60,7 +70,7 @@ func (r *Resolver) ResolveHostnames(ctx context.Context, hostnames []string) {
 }
 
 // perform a reverse lookup for each ip address
-func (r *Resolver) ResolveReverse(ctx context.Context, ips []net.IP, hostname string) {
+func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname string) {
 	blockedIpStr := "0.0.0.0"
 
 	for _, ip := range ips {

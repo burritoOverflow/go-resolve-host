@@ -28,7 +28,7 @@ func getDnsResolver(dnsServerIp *string) (*Resolver, error) {
 		}
 	}
 
-	// otherwise use the default
+	// otherwise, use the default
 	return &Resolver{
 		resolver: net.DefaultResolver,
 	}, nil
@@ -44,6 +44,15 @@ func prefixStr(total time.Duration, timeout time.Duration) string {
 	return prefixStr
 }
 
+func validNetworkString(s string) bool {
+	switch NetworkString(s) {
+	case IP, IPv4, IPv6:
+		return true
+	default:
+		return false
+	}
+}
+
 func main() {
 	InitializeLogger()
 	totalStart := time.Now()
@@ -53,10 +62,16 @@ func main() {
 
 	dnsServerIp := flag.String("dnsserver", "", "The DNS server to use to resolve hostnames")
 	timeoutArg := flag.Int("timeout", defaultTimeoutMs, "Timeout in milliseconds")
+	networkType := flag.String("iptype", string(IPv4), "Resolve ipv4, ipv6, or both. Must be one 'ip', 'ip4', or 'ip6' (default 'ip4')")
 	flag.Parse()
 
 	if *timeoutArg < 0 {
-		LogError("Invalid value provided for timeout: %d\n", *timeoutArg)
+		LogError("Invalid value provided for timeout: '%d'\n", *timeoutArg)
+		log.Fatalf(helpMsg)
+	}
+
+	if !validNetworkString(*networkType) {
+		LogError("Invalid value provided for network string: '%s'\n", *networkType)
 		log.Fatalf(helpMsg)
 	}
 
@@ -76,7 +91,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	r.ResolveHostnames(ctx, hostnames)
+	r.ResolveHostnames(ctx, NetworkString(*networkType), hostnames)
 
 	totalDuration := time.Since(totalStart)
 	addrs := strings.Join(hostnames, ", ")

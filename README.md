@@ -4,7 +4,9 @@ Resolves hostnames (and performs reverse lookup) for n hostnames via the DNS ser
 
 When `dnsserver` is not provided, the default resolver will be used.
 
+`iptype` is an optional flag for resolving hostnames to `ipv4` `ipv6` or both. Defaults to `ip4`.
+
 ```bash
 go build
-./resolve-hostname [-dnsserver dns-server-ip-addr] [-timeout timeout-duration-ms] <hostname1> <hostname2> ...
+./resolve-hostname [-dnsserver dns-server-ip-addr] [-timeout timeout-duration-ms] [-iptype ip|ip4|ip6] <hostname1> <hostname2> ...
 ```
