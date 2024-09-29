@@ -22,17 +22,26 @@ type Resolver struct {
 
 // perform a reverse lookup for each ip address
 func (r *Resolver) resolveReverse(ctx context.Context, ips []net.IP, hostname string) {
+	blockedIpStr := "0.0.0.0"
+
 	for _, ip := range ips {
 		// ignore blocked hostnames
-		blockIpStr := "0.0.0.0"
-		if ip.Equal(net.ParseIP(blockIpStr)) {
-			LogInfo("Ignoring attempt to resolve reverse for %s as it previously resolved to %s", hostname, blockIpStr)
-			continue
+		if ip.Equal(net.ParseIP(blockedIpStr)) {
+			if len(ips) == 1 {
+				// we're done if this addr is the only IP addr.
+				LogInfo("Ignoring attempt to resolve reverse for %s as it previously resolved to %s", hostname, blockedIpStr)
+				return
+			} else {
+				// This is a remote possibility I suppose, but we'll handle it anyway in the rare event it occurs?
+				continue
+			}
 		}
 
 		names, err := r.resolver.LookupAddr(ctx, ip.String())
 		if err != nil {
-			LogError("Error performing reverse lookup for %s (%s): %v", ip, hostname, err)
+			if dnsErr, ok := err.(*net.DNSError); ok {
+				LogError("Error performing reverse lookup for %s: Error - '%s', was not found: %t\n", hostname, dnsErr.Err, dnsErr.IsNotFound)
+			}
 		} else {
 			LogInfo("Reverse for %s (%s): %v", ip, hostname, strings.Join(names, ", "))
 		}
@@ -44,7 +53,9 @@ func (r *Resolver) resolveHostname(ctx context.Context, hostname string) {
 
 	ips, err := r.resolver.LookupIP(ctx, "ip4", hostname)
 	if err != nil {
-		LogError("Failed to resolve %s: %v\n", hostname, err)
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			LogError("Failed to resolve: %s: Error - '%s', was not found: %t\n", hostname, dnsErr.Err, dnsErr.IsNotFound)
+		}
 		return
 	}
 
