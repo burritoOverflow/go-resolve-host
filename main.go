@@ -96,5 +96,12 @@ func main() {
 	totalDuration := time.Since(totalStart)
 	addrs := strings.Join(hostnames, ", ")
 
-	LogInfo("%s for %d addresses (%s): %d ms\n", prefixStr(totalDuration, timeout), len(hostnames), addrs, totalDuration.Milliseconds())
+	var addrStr string
+	if len(hostnames) > 1 {
+		addrStr = "addresses"
+	} else {
+		addrStr = "address"
+	}
+
+	LogInfo("%s for %d %s (%s): %d ms\n", prefixStr(totalDuration, timeout), len(hostnames), addrStr, addrs, totalDuration.Milliseconds())
 }
